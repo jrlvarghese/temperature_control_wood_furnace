@@ -3,12 +3,18 @@
 /* LIBRARIES */
 #include <TM1637Display.h> // for LED display
 #include <OneButton.h>
+#include "max6675.h"
 
 /*INPUT PINS*/
 // ROTARY ENCODER
 #define ROT_SW 2    // this is an interrupt pin
 #define ROT_DAT 3
 #define ROT_CLK 4
+
+//HE TEMP SENSOR
+#define he_so 9
+#define he_cs 8
+#define he_sck 7
 
 /* OUTPUT PINS */
 // LED DISPLAY
@@ -28,6 +34,8 @@ bool troubleshoot = false;
 /* SET UP MODULES */
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(LED_CLK, LED_DAT);
+// Create a MAX6675 object
+MAX6675 he_temp(he_sck, he_cs, he_so);
 
 OneButton button(ROT_SW, true);
 
@@ -78,7 +86,9 @@ void loop(){
     }
 
     if(troubleshoot){
-        Serial.println("outside menu");
+        Serial.print("C = "); 
+        Serial.println(he_temp.readCelsius());
+        delay(1000);
     }
 }
 
@@ -95,6 +105,7 @@ void checkTicks(){
     button.tick();
 }
 
+// function to modify given value using rotary encoder
 int updateViaEncoder(int value, int min, int max){
     // Read present state of the rotary encoder pin A
     rot_clk_present_state = digitalRead(ROT_CLK);
