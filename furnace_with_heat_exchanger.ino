@@ -35,32 +35,114 @@
 bool rot_clk_present_state = true;
 volatile bool rot_clk_last_state = true;
 volatile bool menu_state = false;
+volatile bool selected = false;
 
 int value = 0;
 int prev_value = -1;
 
 bool troubleshoot = false;
 
+unsigned long current_millis = 0;
+// time tracker for serial print
 unsigned long prev_serial_time = 0;
-unsigned long serial_time = 1000;
+unsigned long serial_interval = 1000;
+// time tracker for led display
+unsigned long prev_disp_time = 0;
+unsigned long disp_interval = 2000;
+// time tracker for sensors
+unsigned long prev_sense_time = 0;
+unsigned long sense_interval = 1000;
+// time tracker for menu
+unsigned long menu_max_time = 30000;
+unsigned long menu_timer = 0;
+// time tracker for submenu
+unsigned long submenu_max_time = 10000;
+unsigned long submenu_timer = 0;
 
+// reading variable
+float he_temp_read = 0.0;
+float cabin_temp_read = 0.0;
+float cabin_humid_read = 0.0;
+
+// variables for counters
+int disp_count = 0;
 /* SET UP MODULES */
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(LED_CLK, LED_DAT);
 // Create a MAX6675 object
 MAX6675 he_temp(HE_SCK, HE_CS, HE_SO);
+bool max_sensor_status = false;
 
 OneButton button(ROT_SW, true);
 
 float ahtValue;                               //to store T/RH result
 
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type
+bool aht_sensor_status = false;
 
 /* NUM/LETTER ARRAY FOR LED DISPLAY */
 // dash line on startup
 const uint8_t dash[] = {
   SEG_G, SEG_G, SEG_G, SEG_G
 };
+// Create an array that turns all segments ON
+const uint8_t allON[] = {0xff, 0xff, 0xff, 0xff};
+
+// Create an array that turns all segments OFF
+const uint8_t allOFF[] = {0x00, 0x00, 0x00, 0x00};
+
+// Create an array that sets individual segments per digit to display the word "dOnE"
+const uint8_t done[] = {
+  SEG_B | SEG_C | SEG_D | SEG_E | SEG_G,           // d
+  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F,   // O
+  SEG_C | SEG_E | SEG_G,                           // n
+  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G            // E
+};
+
+// // Create degree celsius symbol
+// const uint8_t celsius[] = {
+//   SEG_A | SEG_B | SEG_F | SEG_G,  // Degree symbol
+//   SEG_A | SEG_D | SEG_E | SEG_F   // C
+// };
+
+const uint8_t celsius[] = {
+  SEG_D | SEG_E | SEG_F | SEG_A
+};
+
+const uint8_t humid[] = {
+  SEG_B | SEG_C | SEG_E | SEG_F | SEG_G
+};
+
+const uint8_t temp[] = {
+  SEG_D | SEG_E | SEG_F | SEG_G
+};
+
+// const uint8_t heat[] = {
+//   SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+//   SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,
+//   SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+//   SEG_D | SEG_E | SEG_F | SEG_G
+// };
+
+const uint8_t heat[] = {
+  SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+  SEG_A | SEG_B | SEG_E | SEG_F | SEG_G
+};
+
+const uint8_t fail[] = {
+  SEG_A | SEG_E | SEG_F | SEG_G,
+  SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+  SEG_E | SEG_F,
+  SEG_E | SEG_F | SEG_D
+};
+
+const uint8_t he[] = {
+  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G
+};
+
+const uint8_t arr[2][1] = {{temp},{humid}};
+
+
 
 void setup(){
     Serial.begin(9600);
@@ -86,41 +168,98 @@ void setup(){
     //clear display
 	display.clear();
 
-    // attachInterrupt(digitalPinToInterrupt(ROT_SW),checkTicks,FALLING);
+    // attach long press function to button
     button.attachLongPressStop(long_press);
+    // attach click function
+    button.attachClick(on_click);
 
-    while(aht20.begin() != true){
+    if(aht20.begin() != true){
         Serial.println(F("AHT2x not connected or fail to load calibration coefficient")); //(F()) save string to flash & keeps dynamic memory free
-        delay(5000);
+        delay(1000);
+        aht_sensor_status = false;
+    }else{
+        aht_sensor_status = true;
     }
     delay(500);
     // create a wire object
     Wire.begin();
 
-    write_EEPROM(1, 128);
+    write_EEPROM_after_check(1, 128);
 
 }
 
 void loop(){
-    // display.setSegments(dash);
-    // delay(1000);
+    // get current millis
+    current_millis = millis();
+    // button tick is run always to detect button press
     button.tick();
     // delay(10);
     
-    while(menu_state){
+    while(menu_state){// main menu
+        current_millis = millis();
+        // button tick is run always to detect button press
         button.tick();
-        value = updateViaEncoder(value, 0, 20);
+
+        value = updateViaEncoder(value, 0, 8);
         if(prev_value != value){
-            Serial.println(value);
+            display.clear();
+            display.showNumberDec(value, false, 1, 0);
         }
         prev_value = value;
-        if(troubleshoot&&((millis() - prev_serial_time)>=serial_time)){
+        if(troubleshoot&&((millis() - prev_serial_time)>=serial_interval)){
             Serial.println("Inside menu");
             prev_serial_time = millis();
+            Serial.println(value);
         }
     }
 
-    if(troubleshoot && ((millis() - prev_serial_time)>=serial_time)){
+    // update led display on regular intervals
+    if(current_millis- prev_disp_time > disp_interval){
+        disp_count>2?disp_count = 0:disp_count;
+        // display readings only if sensor is working
+        if(aht_sensor_status){
+            if(disp_count==0){
+                display.clear();
+                if((int(he_temp_read)/100) == 0){
+                    display.showNumberDec(int(cabin_temp_read), false, 2, 0);
+                }else{
+                    display.showNumberDec(int(cabin_temp_read), false, 3, 0);
+                }
+                display.setSegments(celsius, 1, 3);
+            }
+            if(disp_count==1){
+                display.clear();
+                // display.showNumberDec(setHumidity, false, 2, 0);
+                display.showNumberDec(int(cabin_humid_read), false, 2, 0);
+                display.setSegments(humid, 1, 3);
+            }
+            if(disp_count==2){
+                display.clear();
+                if((int(he_temp_read)/100) == 0){
+                    display.showNumberDec(int(he_temp_read), false, 2, 0);
+                }else{
+                    display.showNumberDec(int(he_temp_read), false, 3, 0);
+                }
+                display.setSegments(he, 1, 3);
+            }
+        }else{// if sensor is not connected or failed
+            display.clear();
+            display.setSegments(fail,4,0);
+        }
+        // increment display counter
+        disp_count++;
+        prev_disp_time = current_millis;
+    }
+
+    // get temperature readings in regular intervals
+    if((current_millis - prev_sense_time)>sense_interval){
+        prev_sense_time = current_millis;
+        he_temp_read = he_temp.readCelsius();
+        cabin_temp_read = aht20.readTemperature();
+        cabin_humid_read = aht20.readHumidity();
+    }
+
+    if(troubleshoot && ((current_millis - prev_serial_time)>=serial_interval)){
         prev_serial_time = millis();
         Serial.print("C = "); 
         Serial.println(he_temp.readCelsius());
@@ -138,6 +277,10 @@ void loop(){
 // Function to be implemented after detecting long press
 void long_press(){
     menu_state = !menu_state;
+}
+
+void on_click(){
+    selected = !selected;
 }
 
 // check ticks 
@@ -218,4 +361,17 @@ byte read_EEPROM(unsigned char addr){
     data = Wire.read();
   }
   return data;
+}
+
+// eeprom write function
+void write_EEPROM_after_check(unsigned char addr, unsigned char data){
+  byte read_data = read_EEPROM(addr);
+  if(data != read_data){
+    Wire.beginTransmission(eeprom);
+    Wire.write(addr);
+    Wire.write(data);
+    Wire.endTransmission();
+  }else{
+    return;
+  }
 }
