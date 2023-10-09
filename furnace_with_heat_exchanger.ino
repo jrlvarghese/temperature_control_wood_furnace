@@ -80,7 +80,7 @@ int disp_count = 0;
 */
 unsigned int parameter_arr[8] = {65, 2, 70, 80, 200, 5, 0, 0};
 // min max array to
-int min_max_arr[8][2] = {{40,70},{0,10},{60,80},{60,150},{100,300},{0,20},{0,10},{0,10}};
+int min_max_arr[8][2] = {{40,70},{0,10},{60,80},{60,150},{100,255},{0,20},{0,10},{0,10}};
 int min = 0;
 int max = 0;
 /* SET UP MODULES */
@@ -192,7 +192,8 @@ void setup(){
     button.attachLongPressStop(long_press);
     // attach click function
     button.attachClick(on_click);
-
+    
+    // check if aht20xx sensor is working fine or not
     if(aht20.begin() != true){
         Serial.println(F("AHT2x not connected or fail to load calibration coefficient")); //(F()) save string to flash & keeps dynamic memory free
         delay(1000);
@@ -203,8 +204,17 @@ void setup(){
     delay(500);
     // create a wire object
     Wire.begin();
-
-    write_EEPROM_after_check(1, 128);
+    
+    // // store parameters into eeprom this is done only once to save initial parameters 
+    // for(int i=0; i<8; i++){
+    //     write_EEPROM(i, parameter_arr[i]);
+    //     delay(10);
+    // }
+    
+    // get parameters from eeprom to parameter array
+    for(int i=0; i<8; i++){
+        parameter_arr[i] = read_EEPROM(i);
+    }
 
 }
 
@@ -266,6 +276,8 @@ void loop(){
                 selected = false;
             }
         }
+        // reset the previous variable 
+        prev_variable = -1;
     }
 
     // update led display on regular intervals
@@ -322,7 +334,10 @@ void loop(){
         Serial.println(aht20.readTemperature());
         Serial.print("AHT H = ");
         Serial.println(aht20.readHumidity());
-        Serial.println(read_EEPROM(1));
+        // Serial.println(read_EEPROM(1));
+        for(int i=0; i<8; i++){
+            Serial.println(read_EEPROM(i));
+        }
     }
 }
 
@@ -336,6 +351,7 @@ void long_press(){
 
 void on_click(){
     selected = !selected;
+    write_EEPROM_after_check(menu_item, parameter_arr[menu_item]);
 }
 
 // check ticks 
