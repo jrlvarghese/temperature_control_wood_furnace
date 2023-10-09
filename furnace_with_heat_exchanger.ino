@@ -61,14 +61,23 @@ unsigned long menu_timer = 0;
 // time tracker for submenu
 unsigned long submenu_max_time = 10000;
 unsigned long submenu_timer = 0;
+// time tracker for actuators
+unsigned long prev_actuator_time = 0;
+unsigned long actuator_interval = 5000; 
 
 // reading variable
 float he_temp_read = 0.0;
 float cabin_temp_read = 0.0;
 float cabin_humid_read = 0.0;
 
+// for average calculations
+float avg_cabin_temp, avg_he_temp = 0.0;
+float cabin_temp_arr[10] = {0};
+float he_temp_arr[10] = {0};
+
 // variables for counters
-int disp_count = 0;
+uint8_t disp_count = 0;
+uint8_t avg_counter = 0;
 
 // parameter array to store values
 /*  1 -- cabin set temperature
@@ -227,16 +236,17 @@ void loop(){
     
     // get the menu time so that it could track what was the last time before entering menu
     menu_timer = current_millis;
+    prev_menu_item = -1;
     while(menu_state){// main menu
         current_millis = millis();
         // button tick is run always to detect button press
         button.tick();
 
-        menu_item = updateViaEncoder(menu_item, 0, 8);
+        menu_item = updateViaEncoder(menu_item, 0, 7);
         if(prev_menu_item != menu_item){
             display.clear();
             display.setSegments(letter_p, 1, 0);
-            display.showNumberDec(menu_item, false, 1, 1);
+            display.showNumberDec(menu_item+1, false, 1, 1);
             // update menu_time to prevent timeout
             menu_timer = current_millis;
             prev_menu_item = menu_item;
@@ -258,8 +268,7 @@ void loop(){
             current_millis = millis();
             // button tick is run always to detect button press
             button.tick();
-            // inorder to display the parameter menu
-            prev_menu_item = -1;
+            // update variable using rotary encoder
             variable = parameter_arr[menu_item];
             if(variable != prev_variable){
                 display.clear();
@@ -275,6 +284,8 @@ void loop(){
             if((current_millis - submenu_timer) > submenu_max_time){
                 selected = false;
             }
+            // inorder to display the parameter menu
+            prev_menu_item = -1;
         }
         // reset the previous variable 
         prev_variable = -1;
@@ -318,12 +329,21 @@ void loop(){
         prev_disp_time = current_millis;
     }
 
-    // get temperature readings in regular intervals
+    // get readings in regular intervals
     if((current_millis - prev_sense_time)>sense_interval){
         prev_sense_time = current_millis;
         he_temp_read = he_temp.readCelsius();
         cabin_temp_read = aht20.readTemperature();
         cabin_humid_read = aht20.readHumidity();
+
+        // for calculating averages
+        cabin_temp_arr[avg_counter] = cabin_temp_read;
+        he_temp_arr[avg_counter] = he_temp_read;
+        (avg_counter>=9)?avg_counter=0:avg_counter++;
+
+        // calculate avg readings
+        avg_cabin_temp = get_avg(cabin_temp_arr);
+        avg_he_temp = get_avg(he_temp_arr);
     }
 
     if(troubleshoot && ((current_millis - prev_serial_time)>=serial_interval)){
@@ -335,9 +355,16 @@ void loop(){
         Serial.print("AHT H = ");
         Serial.println(aht20.readHumidity());
         // Serial.println(read_EEPROM(1));
+        Serial.println("EEPROM Data: ");
         for(int i=0; i<8; i++){
-            Serial.println(read_EEPROM(i));
+            Serial.print(read_EEPROM(i));
+            Serial.print(", ");
         }
+        Serial.println("");
+        Serial.print("Avg cabin temp: ");
+        Serial.println(avg_cabin_temp);
+        Serial.print("Avg he temp: ");
+        Serial.println(avg_he_temp);
     }
 }
 
@@ -351,7 +378,10 @@ void long_press(){
 
 void on_click(){
     selected = !selected;
-    write_EEPROM_after_check(menu_item, parameter_arr[menu_item]);
+    // save to eeprom only if clicked inside a menu
+    if(menu_state){
+        write_EEPROM_after_check(menu_item, parameter_arr[menu_item]);
+    }
 }
 
 // check ticks 
@@ -446,3 +476,12 @@ void write_EEPROM_after_check(unsigned char addr, unsigned char data){
     return;
   }
 }
+
+/* FUNCTION TO CALCULATE AVERAGE */
+float get_avg(float arr[]){
+  float sum = 0;
+  for (int i=0; i<10; i++){
+    sum+=arr[i];
+  }
+  return sum/10.0;
+ }
