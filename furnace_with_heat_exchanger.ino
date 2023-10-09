@@ -195,6 +195,8 @@ void loop(){
     button.tick();
     // delay(10);
     
+    // get the menu time so that it could track what was the last time before entering menu
+    menu_timer = current_millis;
     while(menu_state){// main menu
         current_millis = millis();
         // button tick is run always to detect button press
@@ -204,8 +206,15 @@ void loop(){
         if(prev_value != value){
             display.clear();
             display.showNumberDec(value, false, 1, 0);
+            // update menu_time to prevent timeout
+            menu_timer = current_millis;
         }
         prev_value = value;
+
+        // if the menu time reached a max time without activity exit menu
+        if((current_millis - menu_timer) > menu_max_time){
+            menu_state = false;
+        }
         if(troubleshoot&&((millis() - prev_serial_time)>=serial_interval)){
             Serial.println("Inside menu");
             prev_serial_time = millis();
