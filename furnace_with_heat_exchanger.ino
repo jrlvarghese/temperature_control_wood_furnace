@@ -4,8 +4,8 @@
 #include <TM1637Display.h> // for LED display
 #include <OneButton.h>  // button press detection
 #include "max6675.h"    // temperature sensor module
-#include <Wire.h>
-#include <AHTxx.h>
+#include <Wire.h>       // I2C communication
+#include <AHTxx.h>      // AHT temperature sensor
 
 /*INPUT PINS*/
 // ROTARY ENCODER
@@ -27,6 +27,9 @@
 #define SR_DAT 13
 #define SR_CLK 10
 #define SR_LATCH 12
+
+// EEPROM ADDRESS
+#define eeprom 0x50
 
 /* VARIABLES ARE DECLARED HERE */
 bool rot_clk_present_state = true;
@@ -90,6 +93,11 @@ void setup(){
         Serial.println(F("AHT2x not connected or fail to load calibration coefficient")); //(F()) save string to flash & keeps dynamic memory free
         delay(5000);
     }
+    delay(500);
+    // create a wire object
+    Wire.begin();
+
+    write_EEPROM(1, 128);
 
 }
 
@@ -112,11 +120,6 @@ void loop(){
         }
     }
 
-    for(int i=0; i<6; i++){
-        speedSelect(i);
-        delay(10000);
-    }
-
     if(troubleshoot && ((millis() - prev_serial_time)>=serial_time)){
         prev_serial_time = millis();
         Serial.print("C = "); 
@@ -125,6 +128,7 @@ void loop(){
         Serial.println(aht20.readTemperature());
         Serial.print("AHT H = ");
         Serial.println(aht20.readHumidity());
+        Serial.println(read_EEPROM(1));
     }
 }
 
@@ -191,4 +195,27 @@ void speedSelect(int speed){
     digitalWrite(SR_LATCH, LOW);
     shiftOut(speed_arr[speed]);
     digitalWrite(SR_LATCH, HIGH);    
+}
+
+// eeprom write function
+void write_EEPROM(unsigned char addr, unsigned char data){
+  Wire.beginTransmission(eeprom);
+  Wire.write(addr);
+  Wire.write(data);
+  Wire.endTransmission();
+}
+
+// eprom read function
+byte read_EEPROM(unsigned char addr){
+  byte data;
+  Wire.beginTransmission(eeprom);
+  Wire.write(addr);
+  Wire.endTransmission();
+  delay(5);
+  Wire.requestFrom(0x50,1);
+  delay(5);
+  if(Wire.available()){
+    data = Wire.read();
+  }
+  return data;
 }
