@@ -14,14 +14,19 @@
 #define ROT_CLK 4
 
 //HE TEMP SENSOR
-#define HE_SO 9
+#define HE_SO 7
 #define HE_CS 8
-#define HE_SCK 7
+#define HE_SCK 9
 
 /* OUTPUT PINS */
 // LED DISPLAY
 #define LED_DAT 5
 #define LED_CLK 6
+
+// SHIFT REGISTER FOR CONTROLING BLOWER SPEED
+#define SR_DAT 13
+#define SR_CLK 10
+#define SR_LATCH 12
 
 /* VARIABLES ARE DECLARED HERE */
 bool rot_clk_present_state = true;
@@ -32,6 +37,9 @@ int value = 0;
 int prev_value = -1;
 
 bool troubleshoot = false;
+
+unsigned long prev_serial_time = 0;
+unsigned long serial_time = 1000;
 
 /* SET UP MODULES */
 // Create a display object of type TM1637Display
@@ -57,6 +65,10 @@ void setup(){
     // setup output pins
     pinMode(LED_CLK, OUTPUT);
     pinMode(LED_DAT, OUTPUT);
+
+    pinMode(SR_CLK, OUTPUT);
+    pinMode(SR_DAT, OUTPUT);
+    pinMode(SR_LATCH, OUTPUT);
 
     // setup input pins
     pinMode(ROT_CLK, INPUT);
@@ -94,14 +106,25 @@ void loop(){
             Serial.println(value);
         }
         prev_value = value;
+        if(troubleshoot&&((millis() - prev_serial_time)>=serial_time)){
+            Serial.println("Inside menu");
+            prev_serial_time = millis();
+        }
     }
 
-    if(troubleshoot){
+    for(int i=0; i<6; i++){
+        speedSelect(i);
+        delay(10000);
+    }
+
+    if(troubleshoot && ((millis() - prev_serial_time)>=serial_time)){
+        prev_serial_time = millis();
         Serial.print("C = "); 
         Serial.println(he_temp.readCelsius());
-        Serial.print(" aht C = ");
+        Serial.print("AHT C = ");
         Serial.println(aht20.readTemperature());
-        delay(1000);
+        Serial.print("AHT H = ");
+        Serial.println(aht20.readHumidity());
     }
 }
 
@@ -139,4 +162,33 @@ int updateViaEncoder(int value, int min, int max){
     (value<min)?value=min:value;
 
     return value;
+}
+
+// shiftout function for shift register
+void shiftOut(byte data){
+    bool d_out = false;
+    digitalWrite(SR_DAT, LOW);
+    digitalWrite(SR_CLK, LOW);
+
+    for(int i=7; i>=0; i--){
+        digitalWrite(SR_CLK, LOW);
+        if(data & (1<<i)){
+            d_out = true;
+        }else{
+            d_out = false;
+        }
+        digitalWrite(SR_DAT, d_out);
+        digitalWrite(SR_CLK, HIGH);
+
+        digitalWrite(SR_DAT, LOW);
+    }
+    digitalWrite(SR_CLK, LOW);
+}
+
+void speedSelect(int speed){
+    byte speed_arr[6] = {0b00000000, 0b00100000, 0b00010000,
+                        0b00001000, 0b00000100, 0b00000010};
+    digitalWrite(SR_LATCH, LOW);
+    shiftOut(speed_arr[speed]);
+    digitalWrite(SR_LATCH, HIGH);    
 }
