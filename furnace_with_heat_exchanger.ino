@@ -37,8 +37,11 @@ volatile bool rot_clk_last_state = true;
 volatile bool menu_state = false;
 volatile bool selected = false;
 
-int value = 0;
-int prev_value = -1;
+int menu_item = 0;
+int prev_menu_item = -1;
+
+int variable = 0;
+int prev_variable = -1;
 
 bool troubleshoot = false;
 
@@ -66,6 +69,20 @@ float cabin_humid_read = 0.0;
 
 // variables for counters
 int disp_count = 0;
+
+// parameter array to store values
+/*  1 -- cabin set temperature
+    2 -- cabin hysterisis
+    3 -- cabin max temp
+    4 -- he min temp
+    5 -- he max temp
+    6 -- he hysteresis
+*/
+unsigned int parameter_arr[8] = {65, 2, 70, 80, 200, 5, 0, 0};
+// min max array to
+int min_max_arr[8][2] = {{40,70},{0,10},{60,80},{60,150},{100,300},{0,20},{0,10},{0,10}};
+int min = 0;
+int max = 0;
 /* SET UP MODULES */
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(LED_CLK, LED_DAT);
@@ -117,6 +134,9 @@ const uint8_t temp[] = {
   SEG_D | SEG_E | SEG_F | SEG_G
 };
 
+const uint8_t letter_p[] = {
+    SEG_A | SEG_B | SEG_E | SEG_F | SEG_G
+};
 // const uint8_t heat[] = {
 //   SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
 //   SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,
@@ -202,15 +222,16 @@ void loop(){
         // button tick is run always to detect button press
         button.tick();
 
-        value = updateViaEncoder(value, 0, 8);
-        if(prev_value != value){
+        menu_item = updateViaEncoder(menu_item, 0, 8);
+        if(prev_menu_item != menu_item){
             display.clear();
-            display.showNumberDec(value, false, 1, 0);
+            display.setSegments(letter_p, 1, 0);
+            display.showNumberDec(menu_item, false, 1, 1);
             // update menu_time to prevent timeout
             menu_timer = current_millis;
+            prev_menu_item = menu_item;
         }
-        prev_value = value;
-
+        
         // if the menu time reached a max time without activity exit menu
         if((current_millis - menu_timer) > menu_max_time){
             menu_state = false;
@@ -218,7 +239,32 @@ void loop(){
         if(troubleshoot&&((millis() - prev_serial_time)>=serial_interval)){
             Serial.println("Inside menu");
             prev_serial_time = millis();
-            Serial.println(value);
+            Serial.println(menu_item);
+        }
+        
+        // enter the loop for submenu if clicked
+        submenu_timer = current_millis;
+        while(selected){
+            current_millis = millis();
+            // button tick is run always to detect button press
+            button.tick();
+            // inorder to display the parameter menu
+            prev_menu_item = -1;
+            variable = parameter_arr[menu_item];
+            if(variable != prev_variable){
+                display.clear();
+                display.showNumberDec(parameter_arr[menu_item]);
+                prev_variable = variable;
+                // update submenu timer to prevent timeout
+                submenu_timer = current_millis;
+            }
+            min = min_max_arr[menu_item][0];
+            max = min_max_arr[menu_item][1];
+            parameter_arr[menu_item] = updateViaEncoder(variable, min, max); 
+            // if submenu time reached max time without activity exit menu 
+            if((current_millis - submenu_timer) > submenu_max_time){
+                selected = false;
+            }
         }
     }
 
@@ -297,27 +343,27 @@ void checkTicks(){
     button.tick();
 }
 
-// function to modify given value using rotary encoder
-int updateViaEncoder(int value, int min, int max){
+// function to modify given menu_item using rotary encoder
+int updateViaEncoder(int menu_item, int min, int max){
     // Read present state of the rotary encoder pin A
     rot_clk_present_state = digitalRead(ROT_CLK);
     // Check rotation status and increment or decrement based on direction
     if(rot_clk_present_state != rot_clk_last_state && rot_clk_present_state == true){
         if(digitalRead(ROT_DAT) == rot_clk_present_state){
-            value++;
+            menu_item++;
         }else{
-            value--;
+            menu_item--;
         }
         //Serial.println(count);
     }
     // remember the last state
     rot_clk_last_state = rot_clk_present_state;
     //    delay(1);
-    // check if value exceeding the limits
-    (value>max)?value=max:value;
-    (value<min)?value=min:value;
+    // check if menu_item exceeding the limits
+    (menu_item>max)?menu_item=max:menu_item;
+    (menu_item<min)?menu_item=min:menu_item;
 
-    return value;
+    return menu_item;
 }
 
 // shiftout function for shift register
