@@ -6,6 +6,7 @@
 #include "max6675.h"    // temperature sensor module
 #include <Wire.h>       // I2C communication
 #include <AHTxx.h>      // AHT temperature sensor
+#include <Servo.h>      // servo control 
 
 /*INPUT PINS*/
 // ROTARY ENCODER
@@ -24,9 +25,13 @@
 #define LED_CLK 6
 
 // SHIFT REGISTER FOR CONTROLING BLOWER SPEED
-#define SR_DAT 13
-#define SR_CLK 10
-#define SR_LATCH 12
+// #define SR_DAT 13
+// #define SR_CLK 10
+// #define SR_LATCH 12
+
+// OUTPUT PINS
+#define BLOWER 13
+#define WASTE_GATE 11
 
 // EEPROM ADDRESS
 #define eeprom 0x50
@@ -75,27 +80,41 @@ float avg_cabin_temp, avg_he_temp = 0.0;
 float cabin_temp_arr[10] = {0};
 float he_temp_arr[10] = {0};
 
+// sequence variable to determine actuator status
+uint8_t output_state_arr[3][3] = {{0,0},{0,1},{1,0}};
+uint8_t output_state = 0;
+uint8_t prev_output_state = -1;
+
 // variables for counters
 uint8_t disp_count = 0;
 uint8_t avg_counter = 0;
 
-// parameter array to store values
-/*  1 -- cabin set temperature
-    2 -- cabin hysterisis
-    3 -- cabin max temp
-    4 -- he min temp
-    5 -- he max temp
-    6 -- he hysteresis
+// parameter array to store values (default values in bracket)
+/*  1 -- cabin set temperature (65)
+    2 -- cabin hysterisis (2)
+    3 -- cabin max temp (10) --> (cabin set temp + this value)
+    4 -- he min temp (80)
+    5 -- he max temp (200)
+    6 -- he hysteresis (5)
 */
-unsigned int parameter_arr[8] = {65, 2, 70, 80, 200, 5, 0, 0};
+unsigned int parameter_arr[8] = {65, 2, 10, 80, 200, 5, 0, 0};
 // min max array to
-int min_max_arr[8][2] = {{40,70},{0,10},{60,80},{60,150},{100,255},{0,20},{0,10},{0,10}};
+int min_max_arr[8][2] = {{40,70},{0,8},{0,10},{60,150},{100,255},{0,10},{0,10},{0,10}};
 int min = 0;
 int max = 0;
+
+// variables for setting
+int cabin_set_temp = 0;
+int cabin_temp_hyster = 0;
+int cabin_max_temp = 0;
+
+int he_min_temp = 0;
+int he_max_temp = 0;
+int he_hyster = 0;
 /* SET UP MODULES */
 // Create a display object of type TM1637Display
 TM1637Display display = TM1637Display(LED_CLK, LED_DAT);
-// Create a MAX6675 object
+//Create a MAX6675 object
 MAX6675 he_temp(HE_SCK, HE_CS, HE_SO);
 bool max_sensor_status = false;
 
@@ -105,6 +124,8 @@ float ahtValue;                               //to store T/RH result
 
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); //sensor address, sensor type
 bool aht_sensor_status = false;
+
+Servo wg_servo;
 
 /* NUM/LETTER ARRAY FOR LED DISPLAY */
 // dash line on startup
@@ -180,9 +201,14 @@ void setup(){
     pinMode(LED_CLK, OUTPUT);
     pinMode(LED_DAT, OUTPUT);
 
-    pinMode(SR_CLK, OUTPUT);
-    pinMode(SR_DAT, OUTPUT);
-    pinMode(SR_LATCH, OUTPUT);
+    pinMode(BLOWER, OUTPUT);
+    // pinMode(WASTE_GATE, OUTPUT);
+
+    digitalWrite(BLOWER, LOW);
+    // digitalWrite(WASTE_GATE, LOW);
+    // pinMode(SR_CLK, OUTPUT);
+    // pinMode(SR_DAT, OUTPUT);
+    // pinMode(SR_LATCH, OUTPUT);
 
     // setup input pins
     pinMode(ROT_CLK, INPUT);
@@ -223,7 +249,24 @@ void setup(){
     // get parameters from eeprom to parameter array
     for(int i=0; i<8; i++){
         parameter_arr[i] = read_EEPROM(i);
+        // Serial.print(i);
+        // Serial.print(": ");
+        // Serial.println(parameter_arr[i]);
+        delay(10);
     }
+
+    // attach servo
+    // wg_servo.attach(11);
+
+    // blower_control(HIGH);
+    // delay(3000);
+    // test servo
+    // wg_control(1);
+    // delay(2000);
+    // wg_control(0);
+    // delay(2000);
+    // wg_control(1);
+    // delay(2000);
 
 }
 
@@ -344,8 +387,61 @@ void loop(){
         // calculate avg readings
         avg_cabin_temp = get_avg(cabin_temp_arr);
         avg_he_temp = get_avg(he_temp_arr);
+
+        // get parameters before entering algorithmic loop
+        cabin_set_temp = parameter_arr[0];
+        cabin_max_temp = cabin_set_temp + parameter_arr[2];
+        he_min_temp = parameter_arr[3];
+        he_max_temp = parameter_arr[4];
+        cabin_temp_hyster = parameter_arr[1];
+
+        // update the status of actuators every time after checking
+        // if cabin temp reaches above set limit
+        // Serial.println();
+        // Serial.println("Differences");
+        // Serial.print("avg_cab - cab_max: ");
+        // Serial.println(avg_cabin_temp-float(cabin_max_temp));
+
+        // Serial.print("avg_cab - cab_set: ");
+        // Serial.println(avg_cabin_temp - float(cabin_set_temp));
+
+        // Serial.print("cab_set - avg_cabin_tem");
+        // Serial.println((cabin_set_temp)-avg_cabin_temp);
+
+        if((avg_cabin_temp - float(cabin_set_temp))>=0.1){
+            // check if it's above cabin max temperature
+            if((avg_cabin_temp-float(cabin_max_temp))>=0.1){
+                // blower_control(LOW);
+                // wg_control(HIGH);
+                output_state = 1;
+                // Serial.println("Condition 1");
+            }else if(int(avg_he_temp)>=he_min_temp && int(avg_he_temp)<he_max_temp){// if he temp is above min and below max
+                // blower_control(HIGH);
+                // wg_control(LOW);
+                output_state = 2;
+                // Serial.println("Condition 2");
+            }
+        }else if(float((cabin_set_temp)-avg_cabin_temp)>=cabin_temp_hyster){
+            // blower_control(LOW);
+            // wg_control(LOW);
+            output_state = 0;
+            // Serial.println("Condition 3");
+        }
+        // determine the state of actuators based on above checks
+        if(output_state != prev_output_state){
+            blower_control(output_state_arr[output_state][0]);
+            wg_control(output_state_arr[output_state][1]);
+            prev_output_state = output_state;
+        }
+        Serial.print("Output state: ");
+        Serial.println(output_state);
+        Serial.println();
     }
 
+    // actuator control goes here
+    
+
+    // Serial logging for trouble shooting
     if(troubleshoot && ((current_millis - prev_serial_time)>=serial_interval)){
         prev_serial_time = millis();
         Serial.print("C = "); 
@@ -412,34 +508,34 @@ int updateViaEncoder(int menu_item, int min, int max){
     return menu_item;
 }
 
-// shiftout function for shift register
-void shiftOut(byte data){
-    bool d_out = false;
-    digitalWrite(SR_DAT, LOW);
-    digitalWrite(SR_CLK, LOW);
+// // shiftout function for shift register
+// void shiftOut(byte data){
+//     bool d_out = false;
+//     digitalWrite(SR_DAT, LOW);
+//     digitalWrite(SR_CLK, LOW);
 
-    for(int i=7; i>=0; i--){
-        digitalWrite(SR_CLK, LOW);
-        if(data & (1<<i)){
-            d_out = true;
-        }else{
-            d_out = false;
-        }
-        digitalWrite(SR_DAT, d_out);
-        digitalWrite(SR_CLK, HIGH);
+//     for(int i=7; i>=0; i--){
+//         digitalWrite(SR_CLK, LOW);
+//         if(data & (1<<i)){
+//             d_out = true;
+//         }else{
+//             d_out = false;
+//         }
+//         digitalWrite(SR_DAT, d_out);
+//         digitalWrite(SR_CLK, HIGH);
 
-        digitalWrite(SR_DAT, LOW);
-    }
-    digitalWrite(SR_CLK, LOW);
-}
+//         digitalWrite(SR_DAT, LOW);
+//     }
+//     digitalWrite(SR_CLK, LOW);
+// }
 
-void speedSelect(int speed){
-    byte speed_arr[6] = {0b00000000, 0b00100000, 0b00010000,
-                        0b00001000, 0b00000100, 0b00000010};
-    digitalWrite(SR_LATCH, LOW);
-    shiftOut(speed_arr[speed]);
-    digitalWrite(SR_LATCH, HIGH);    
-}
+// void speedSelect(int speed){
+//     byte speed_arr[6] = {0b00000000, 0b00100000, 0b00010000,
+//                         0b00001000, 0b00000100, 0b00000010};
+//     digitalWrite(SR_LATCH, LOW);
+//     shiftOut(speed_arr[speed]);
+//     digitalWrite(SR_LATCH, HIGH);    
+// }
 
 // eeprom write function
 void write_EEPROM(unsigned char addr, unsigned char data){
@@ -485,3 +581,28 @@ float get_avg(float arr[]){
   }
   return sum/10.0;
  }
+
+ /* CONTROL BLOWER*/
+ void blower_control(bool state){
+    digitalWrite(BLOWER, state);
+ }
+
+/* CONTROL WASTEGATE VALVE */
+void wg_control(bool state){
+    wg_servo.attach(11);    // attach servo pin everytime
+    if(state){// if state is high open the wastegate
+       for(int i=0; i<=180; i++){
+        wg_servo.write(i);
+        delay(20);
+       }
+    }else if(state == LOW){
+        for(int i=180; i>=0; i--){
+        wg_servo.write(i);
+        delay(20);
+       }
+    }
+    // detach servo to avoid flickering movements
+    wg_servo.detach();
+    // set the pin to low
+    // digitalWrite(WASTE_GATE, LOW);
+}
