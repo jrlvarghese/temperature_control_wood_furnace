@@ -60,6 +60,20 @@ unsigned long menu_timer = 0;
 unsigned long submenu_max_time = 10000;
 unsigned long submenu_timer = 0;
 
+// parameter array to store values (default values in bracket)
+/*  1 -- cabin set temperature (65)
+    2 -- cabin hysterisis (2)
+    3 -- cabin max temp (10) --> (cabin set temp + this value)
+    4 -- he min temp (80)
+    5 -- he max temp (200)
+    6 -- he hysteresis (5)
+*/
+unsigned int parameter_arr[8] = {65, 2, 10, 80, 200, 5, 0, 0};
+// min max array to
+int min_max_arr[8][2] = {{40,70},{0,8},{0,10},{60,150},{100,255},{0,15},{0,10},{0,10}};
+int variable_min = 0;
+int variable_max = 0;
+
 
 /* NUM/LETTER ARRAY FOR LED DISPLAY */
 // dash line on startup
@@ -196,6 +210,30 @@ void loop(){
     if((current_millis - menu_timer)>menu_max_time){
       menu_state = false;
     }
+
+    // SUB MENU STARTS HERE
+    submenu_timer = current_millis; //keep track of the time before entering submenu
+    while(selected){
+      current_millis = millis();  //get current time
+      button.tick();  // check for button press
+      variable = parameter_arr[menu_item]; // get the variable to be adjusted
+      variable_min = min_max_arr[menu_item][0]; //get the min and max values assigned for the variable
+      variable_max = min_max_arr[menu_item][1];
+      parameter_arr[menu_item] = updateViaEncoder(variable, variable_min, variable_max); // modify the variable using rotary encoder
+      if(variable != prev_variable){  //when the values are changed update the display
+        disp_set.clear();
+        disp_set.showNumberDec(parameter_arr[menu_item]);
+        prev_variable = variable; // keep track of the variable
+        submenu_timer = current_millis; //update submenu_timer to prevent timeout
+      }
+      if((current_millis - submenu_timer)>submenu_max_time){//exit the submenu when the time exceeds set time
+        selected = false;
+      }
+      prev_menu_item = -1;  //so that after exiting the submenu, parameter menu will update automatically
+
+    }
+    prev_variable = -1; //reset the previous variable so that the display will be updated next time
+
         
   }//END OF WHILE LOOP FOR MAIN MENU
   
@@ -218,7 +256,9 @@ void long_press(){
 }
 
 void on_click(){
+  if(menu_state){
     selected = !selected;
+  }
     // // save to eeprom only if clicked inside a menu
     // if(menu_state){
     //     write_EEPROM_after_check(menu_item, parameter_arr[menu_item]);
