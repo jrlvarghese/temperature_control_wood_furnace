@@ -6,13 +6,17 @@
 // #include "max6675.h"    // temperature sensor module
 #include <Wire.h>       // I2C communication
 #include <AHTxx.h>      // AHT temperature sensor
-#include <Servo.h>      // servo control 
+// #include <Servo.h>      // servo control 
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 /*INPUT PINS*/
 // ROTARY ENCODER
 #define ROT_SW 2    // this is an interrupt pin
 #define ROT_DAT 3
 #define ROT_CLK 4
+
+#define DS_TEMP 5
 
 /* OUTPUT PINS */
 // LED DISPLAY
@@ -25,6 +29,9 @@
 // Create a display object of type TM1637Display
 TM1637Display disp_current = TM1637Display(DISP_A_CLK, DISP_A_DAT);
 TM1637Display disp_set = TM1637Display(DISP_B_CLK, DISP_B_DAT);
+// create OneWire object and pass the sensor library
+OneWire one_wire(DS_TEMP);
+DallasTemperature ds_temp_sensor(&one_wire);
 
 // Create a module for button
 OneButton button(ROT_SW, true, true); // input pullup activated and switch is active low
@@ -49,7 +56,7 @@ unsigned long prev_serial_time = 0;
 unsigned long serial_interval = 1000;
 // time tracker for led display
 unsigned long prev_disp_time = 0;
-unsigned long disp_interval = 2000;
+unsigned long disp_interval = 5000;
 // time tracker for sensors
 unsigned long prev_sense_time = 0;
 unsigned long sense_interval = 1000;
@@ -73,6 +80,10 @@ unsigned int parameter_arr[8] = {65, 2, 10, 80, 200, 5, 0, 0};
 int min_max_arr[8][2] = {{40,70},{0,8},{0,10},{60,150},{100,255},{0,15},{0,10},{0,10}};
 int variable_min = 0;
 int variable_max = 0;
+
+// variable to read sensing parameters
+float input_temp = 0;
+bool ds_sensor_status = false;
 
 
 /* NUM/LETTER ARRAY FOR LED DISPLAY */
@@ -171,6 +182,9 @@ void setup(){
     button.attachLongPressStop(long_press);
     // attach click function
     button.attachClick(on_click);
+
+    // start DS18B20 temperature sensor
+    ds_temp_sensor.begin();
 }
 
 void loop(){
@@ -179,15 +193,7 @@ void loop(){
   // button tick is run always to detect button press
   button.tick();
 
-  // update the display at predefined interval
-  if((prev_disp_time-current_millis)>disp_interval){
-    disp_current.clear();
-    disp_current.showNumberDec(i);
-    i++;
-    if(i>999)i=0;
-    prev_disp_time = current_millis;
-  }
-
+  
   //get the menu time, so that to track the time before entering menu
   menu_timer = current_millis;
   prev_menu_item = -1;
@@ -237,6 +243,30 @@ void loop(){
         
   }//END OF WHILE LOOP FOR MAIN MENU
   
+
+  // GET READINGS FROM THE SENSORS AT REGULAR INTERVALS
+  if((current_millis - prev_sense_time)>sense_interval){
+    // read temperature from the DS18b20 sensor
+    ds_temp_sensor.requestTemperatures();
+    input_temp = ds_temp_sensor.getTempCByIndex(0);
+    if(input_temp != DEVICE_DISCONNECTED_C){
+      ds_sensor_status = true;
+    }else{
+      ds_sensor_status = false;
+    }
+    
+    prev_sense_time = current_millis;
+  }
+
+  // update the display at predefined interval
+  if((prev_disp_time-current_millis)>disp_interval){
+    disp_current.clear();
+    disp_current.showNumberDec(int(input_temp));
+    i++;
+    if(i>parameter_arr[0])i=0;
+    prev_disp_time = current_millis;
+  }
+
     
 }
 
