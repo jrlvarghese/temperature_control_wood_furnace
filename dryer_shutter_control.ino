@@ -260,10 +260,14 @@ void loop(){
 
   // update the display at predefined interval
   if((prev_disp_time-current_millis)>disp_interval){
-    disp_current.clear();
-    disp_current.showNumberDec(int(input_temp));
-    i++;
-    if(i>parameter_arr[0])i=0;
+    if(ds_sensor_status){
+      disp_current.clear();
+      disp_current.showNumberDec(int(input_temp));
+    }else{
+      disp_current.clear();
+      disp_current.setSegments(fail);
+    }
+    
     prev_disp_time = current_millis;
   }
 
