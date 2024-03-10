@@ -271,10 +271,15 @@ void TM1637::showReadingWithUnit(int temp, char unit)
     }else{
         showNumberDec(temp, false, 3, 0);
     }
-    if(unit = 'C'){
+    if(unit=='C'){
         setSegments(c_letter, 1, 3);
-    }else if(unit = 'H'){
+    }else if(unit=='H'){
         setSegments(h_letter, 1, 3);
     }
     
+}
+
+void TM1637::showString(String word)
+{
+
 }

@@ -48,6 +48,8 @@ int prev_menu_item = -1;
 int variable = 0;
 int prev_variable = -1;
 
+int disp_count = 0;
+
 bool troubleshoot = false;
 
 unsigned long current_millis = 0;
@@ -105,23 +107,6 @@ const uint8_t done[] = {
   SEG_A | SEG_D | SEG_E | SEG_F | SEG_G            // E
 };
 
-// // Create degree celsius symbol
-// const uint8_t celsius[] = {
-//   SEG_A | SEG_B | SEG_F | SEG_G,  // Degree symbol
-//   SEG_A | SEG_D | SEG_E | SEG_F   // C
-// };
-
-const uint8_t celsius[] = {
-  SEG_D | SEG_E | SEG_F | SEG_A
-};
-
-const uint8_t humid[] = {
-  SEG_B | SEG_C | SEG_E | SEG_F | SEG_G
-};
-
-const uint8_t temp[] = {
-  SEG_D | SEG_E | SEG_F | SEG_G
-};
 
 const uint8_t letter_p[] = {
     SEG_A | SEG_B | SEG_E | SEG_F | SEG_G
@@ -145,14 +130,11 @@ const uint8_t fail[] = {
   SEG_E | SEG_F | SEG_D
 };
 
-const uint8_t he[] = {
-  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G
-};
-
-const uint8_t arr[2][1] = {{temp},{humid}};
 
 // for test purposes
 int i=0;
+int j=0;
+char char_arr[] = {'a','b','c','d','e','f','g','h','i','j'};
 
 void setup(){
     Serial.begin(9600);
@@ -259,15 +241,23 @@ void loop(){
   }
 
   // update the display at predefined interval
-  if((prev_disp_time-current_millis)>disp_interval){
+  if((current_millis-prev_disp_time)>disp_interval){
+    disp_count>1?disp_count = 0:disp_count; // update the display counter
+    j>10?j=0:j;
     if(ds_sensor_status){
-      disp_current.showReadingWithUnit(int(input_temp), 'C');
+      if(disp_count==0){
+        disp_current.showReadingWithUnit(int(input_temp), 'C');
+      }
+      if(disp_count==1){
+        disp_current.showReadingWithUnit((int)char_arr[j], 'H');
+      }
     }else{
       disp_current.clear();
       disp_current.setSegments(fail);
     }
-    
-    prev_disp_time = current_millis;
+    j++;
+    disp_count++; // increment display counter
+    prev_disp_time = current_millis;  // reset the display timer
   }
 
     
