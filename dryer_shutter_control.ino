@@ -1,7 +1,7 @@
 /* CONTROL SYSTEM FOR FIREWOOD FURNACE WITH HEAT EXCHANGER */
 
 /* LIBRARIES */
-#include <TM1637Display.h> // for LED display
+#include "TM1637.h" // for LED display
 #include <OneButton.h>  // button press detection
 // #include "max6675.h"    // temperature sensor module
 #include <Wire.h>       // I2C communication
@@ -27,8 +27,8 @@
 
 /* SET UP MODULES */
 // Create a display object of type TM1637Display
-TM1637Display disp_current = TM1637Display(DISP_A_CLK, DISP_A_DAT);
-TM1637Display disp_set = TM1637Display(DISP_B_CLK, DISP_B_DAT);
+TM1637 disp_current = TM1637(DISP_A_CLK, DISP_A_DAT);
+TM1637 disp_set = TM1637(DISP_B_CLK, DISP_B_DAT);
 // create OneWire object and pass the sensor library
 OneWire one_wire(DS_TEMP);
 DallasTemperature ds_temp_sensor(&one_wire);
