@@ -141,6 +141,9 @@ public:
   //! @return A code representing the 7 segment image of the digit (LSB - segment A;
   //!         bit 6 - segment G; bit 7 - always zero)
   static uint8_t encodeDigit(uint8_t digit);
+  
+  // Display temperature or humidity with a number and letter t at the end of number
+  void showReadingWithUnit(int temp, char unit);
 
 protected:
    void bitDelay();

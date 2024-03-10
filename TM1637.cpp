@@ -36,6 +36,11 @@ extern "C" {
 //  E |   | C
 //     ---
 //      D
+
+const uint8_t t_letter[] = {0b01111000};
+const uint8_t h_letter[] = {0b01110110};
+const uint8_t c_letter[] = {0b00111001};
+
 const uint8_t digitToSegment[] = {
  // XGFEDCBA
   0b00111111,    // 0
@@ -258,3 +263,18 @@ uint8_t TM1637::encodeDigit(uint8_t digit)
 }
 
 
+void TM1637::showReadingWithUnit(int temp, char unit)
+{
+    clear();
+    if(temp/100 == 0){
+        showNumberDec(temp, false, 2, 0);
+    }else{
+        showNumberDec(temp, false, 3, 0);
+    }
+    if(unit = 'C'){
+        setSegments(c_letter, 1, 3);
+    }else if(unit = 'H'){
+        setSegments(h_letter, 1, 3);
+    }
+    
+}
