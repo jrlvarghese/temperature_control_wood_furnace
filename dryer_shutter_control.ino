@@ -89,6 +89,14 @@ int variable_max = 0;
 float input_temp = 0;
 bool ds_sensor_status = false;
 
+// variables for setting
+float set_temp = 0.0;
+float temp_hyster = 0.0;
+float temp_arr[10] = {0.0};
+float avg_temp = 0.0;
+
+int avg_counter = 0;
+
 
 /* NUM/LETTER ARRAY FOR LED DISPLAY */
 // dash line on startup
@@ -113,10 +121,7 @@ void setup(){
 
   Serial.begin(9600);
   // setup output pins
-  pinMode(DISP_A_CLK, OUTPUT);
-  pinMode(DISP_A_DAT, OUTPUT);
-  pinMode(DISP_B_CLK, OUTPUT);
-  pinMode(DISP_B_DAT, OUTPUT);
+  pinMode(SHUTTER, OUTPUT);
   
   // setup input pins
   pinMode(ROT_CLK, INPUT);
@@ -153,6 +158,10 @@ void setup(){
     // Serial.println(parameter_arr[i]);
     delay(10);
   }
+  digitalWrite(SHUTTER, HIGH);
+  delay(1000);
+  digitalWrite(SHUTTER, LOW);
+  delay(1000);
 
 
 }
@@ -224,7 +233,24 @@ void loop(){
     }else{
       ds_sensor_status = false;
     }
-    
+
+    // get average temperature
+    avg_counter>=10?avg_counter=0:avg_counter;  //reset the average counter
+    temp_arr[avg_counter] = input_temp; // update array values
+    avg_temp = get_avg(temp_arr); // get the average from given array
+    avg_counter++;  // increment the average counter
+    // CONTROL LOGIC
+    set_temp = float(parameter_arr[0]);
+    temp_hyster = float(parameter_arr[1]);
+    //if average temp is greater than set temperature open the shutter to allow cold air
+    if((avg_temp-set_temp)>0.1){
+      digitalWrite(SHUTTER, parameter_arr[2]);
+    }
+    // if average temperature is less than or equal to difference between set temp and hysteresis close the shutter
+    if(((set_temp-temp_hyster)-avg_temp)>0.1){
+      digitalWrite(SHUTTER, !parameter_arr[2]);
+    }
+    // rest the timer
     prev_sense_time = current_millis;
   }
 
@@ -365,14 +391,14 @@ void write_EEPROM_after_check(unsigned char addr, unsigned char data){
   }
 }
 
-// /* FUNCTION TO CALCULATE AVERAGE */
-// float get_avg(float arr[]){
-//   float sum = 0;
-//   for (int i=0; i<10; i++){
-//     sum+=arr[i];
-//   }
-//   return sum/10.0;
-//  }
+/* FUNCTION TO CALCULATE AVERAGE */
+float get_avg(float arr[]){
+  float sum = 0;
+  for (int i=0; i<sizeof(arr); i++){
+    sum+=arr[i];
+  }
+  return sum/float(sizeof(arr));
+ }
 
 //  /* CONTROL BLOWER*/
 //  void blower_control(bool state){
