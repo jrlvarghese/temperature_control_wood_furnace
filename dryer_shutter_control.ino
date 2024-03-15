@@ -26,6 +26,10 @@
 #define DISP_B_CLK 10
 
 #define SHUTTER 13
+
+// EEPROM ADDRESS
+#define eeprom 0x50
+
 /* SET UP MODULES */
 // Create a display object of type TM1637Display
 TM1637 disp_current = TM1637(DISP_A_CLK, DISP_A_DAT);
@@ -75,7 +79,7 @@ unsigned long submenu_timer = 0;
     2 -- cabin hysterisis (2)
     3 -- output actuator state (1)
 */
-unsigned int parameter_arr[8] = {65, 2, 1};
+unsigned int parameter_arr[3] = {65, 2, 1};
 // min max array to
 int min_max_arr[8][2] = {{40,70},{0,10}, {0,1}};
 int variable_min = 0;
@@ -106,36 +110,56 @@ int j=0;
 
 
 void setup(){
-    Serial.begin(9600);
-    // setup output pins
-    pinMode(DISP_A_CLK, OUTPUT);
-    pinMode(DISP_A_DAT, OUTPUT);
-    pinMode(DISP_B_CLK, OUTPUT);
-    pinMode(DISP_B_DAT, OUTPUT);
-    
-    // setup input pins
-    pinMode(ROT_CLK, INPUT);
-    pinMode(ROT_DAT, INPUT);
-    // pinMode(ROT_SW, INPUT);
 
-    // Set the LED display brightness to 5 (0=dimmest 7=brightest)
-	  disp_current.setBrightness(5);
-    disp_set.setBrightness(5);
-    // display dash on start up
-	  disp_current.setSegments(dash);
-    disp_set.setSegments(dash);
-    delay(1000);
-    //clear display
-	  disp_current.clear();
-    disp_set.clear();
-    
-    // attach long press function to button
-    button.attachLongPressStop(long_press);
-    // attach click function
-    button.attachClick(on_click);
+  Serial.begin(9600);
+  // setup output pins
+  pinMode(DISP_A_CLK, OUTPUT);
+  pinMode(DISP_A_DAT, OUTPUT);
+  pinMode(DISP_B_CLK, OUTPUT);
+  pinMode(DISP_B_DAT, OUTPUT);
+  
+  // setup input pins
+  pinMode(ROT_CLK, INPUT);
+  pinMode(ROT_DAT, INPUT);
+  // pinMode(ROT_SW, INPUT);
 
-    // start DS18B20 temperature sensor
-    ds_temp_sensor.begin();
+  // Set the LED display brightness to 5 (0=dimmest 7=brightest)
+  disp_current.setBrightness(5);
+  disp_set.setBrightness(5);
+  // display dash on start up
+  disp_current.setSegments(dash);
+  disp_set.setSegments(dash);
+  delay(1000);
+  //clear display
+  disp_current.clear();
+  disp_set.clear();
+  
+  // attach long press function to button
+  button.attachLongPressStop(long_press);
+  // attach click function
+  button.attachClick(on_click);
+
+  // start DS18B20 temperature sensor
+  ds_temp_sensor.begin();
+
+  // begin I2C communication
+  Wire.begin();
+  // // store parameters into eeprom this is done only once to save initial parameters 
+  // for(int i=0; i<sizeof(parameter_arr); i++){
+  //     write_EEPROM(i, parameter_arr[i]);
+  //     delay(10);
+  // }
+  
+  // get parameters from eeprom to parameter array
+  for(int i=0; i<3; i++){
+    parameter_arr[i] = read_EEPROM(i);
+    // Serial.print(i);
+    // Serial.print(": ");
+    // Serial.println(parameter_arr[i]);
+    delay(10);
+  }
+
+
 }
 
 void loop(){
@@ -154,7 +178,7 @@ void loop(){
     // run button ticks to track button press
     button.tick();
     // update the menu selection while turning rotary encoder knob
-    menu_item = updateViaEncoder(menu_item, 0, 7);
+    menu_item = updateViaEncoder(menu_item, 0, 2);
     // if there is change in menu selection update the display
     if(prev_menu_item != menu_item){
       disp_set.show_menu_option(menu_item);
@@ -250,10 +274,10 @@ void on_click(){
   if(menu_state){
     selected = !selected;
   }
-    // // save to eeprom only if clicked inside a menu
-    // if(menu_state){
-    //     write_EEPROM_after_check(menu_item, parameter_arr[menu_item]);
-    // }
+    // save to eeprom only if clicked inside a menu
+    if(menu_state){
+      write_EEPROM_after_check(menu_item, parameter_arr[menu_item]);
+    }
 }
 
 // check ticks 
@@ -313,41 +337,41 @@ int updateViaEncoder(int menu_item, int min, int max){
 //     digitalWrite(SR_LATCH, HIGH);    
 // }
 
-// // eeprom write function
-// void write_EEPROM(unsigned char addr, unsigned char data){
-//   Wire.beginTransmission(eeprom);
-//   Wire.write(addr);
-//   Wire.write(data);
-//   Wire.endTransmission();
-// }
+// eeprom write function
+void write_EEPROM(unsigned char addr, unsigned char data){
+  Wire.beginTransmission(eeprom);
+  Wire.write(addr);
+  Wire.write(data);
+  Wire.endTransmission();
+}
 
-// // eprom read function
-// byte read_EEPROM(unsigned char addr){
-//   byte data;
-//   Wire.beginTransmission(eeprom);
-//   Wire.write(addr);
-//   Wire.endTransmission();
-//   delay(5);
-//   Wire.requestFrom(0x50,1);
-//   delay(5);
-//   if(Wire.available()){
-//     data = Wire.read();
-//   }
-//   return data;
-// }
+// eprom read function
+byte read_EEPROM(unsigned char addr){
+  byte data;
+  Wire.beginTransmission(eeprom);
+  Wire.write(addr);
+  Wire.endTransmission();
+  delay(5);
+  Wire.requestFrom(0x50,1);
+  delay(5);
+  if(Wire.available()){
+    data = Wire.read();
+  }
+  return data;
+}
 
-// // eeprom write function
-// void write_EEPROM_after_check(unsigned char addr, unsigned char data){
-//   byte read_data = read_EEPROM(addr);
-//   if(data != read_data){
-//     Wire.beginTransmission(eeprom);
-//     Wire.write(addr);
-//     Wire.write(data);
-//     Wire.endTransmission();
-//   }else{
-//     return;
-//   }
-// }
+// eeprom write function
+void write_EEPROM_after_check(unsigned char addr, unsigned char data){
+  byte read_data = read_EEPROM(addr);
+  if(data != read_data){
+    Wire.beginTransmission(eeprom);
+    Wire.write(addr);
+    Wire.write(data);
+    Wire.endTransmission();
+  }else{
+    return;
+  }
+}
 
 // /* FUNCTION TO CALCULATE AVERAGE */
 // float get_avg(float arr[]){
