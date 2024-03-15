@@ -144,11 +144,6 @@ void setup(){
 
   // begin I2C communication
   Wire.begin();
-  // // store parameters into eeprom this is done only once to save initial parameters 
-  // for(int i=0; i<sizeof(parameter_arr); i++){
-  //     write_EEPROM(i, parameter_arr[i]);
-  //     delay(10);
-  // }
   
   // get parameters from eeprom to parameter array
   for(int i=0; i<sizeof(parameter_arr); i++){
@@ -235,18 +230,15 @@ void loop(){
 
   // update the display at predefined interval
   if((current_millis-prev_disp_time)>disp_interval){
-    disp_count>2?disp_count = 0:disp_count; // update the display counter
-    j>10?j=0:j;
+    disp_count>1?disp_count = 0:disp_count; // update the display counter
     if(ds_sensor_status){
       if(disp_count==0){
         disp_current.showReadingWithUnit(int(input_temp), 'C');
+        disp_set.showReadingWithUnit(parameter_arr[0], 'C');
       }
       if(disp_count==1){
         disp_current.showReadingWithUnit(85, 'H');
         j++;
-      }
-      if(disp_count==2){
-        disp_current.clear();
       }
     }else{
       disp_current.clear();
