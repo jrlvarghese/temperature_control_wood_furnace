@@ -18,6 +18,7 @@
 #define __TM1637__
 
 #include <inttypes.h>
+#include <string.h>
 
 #define SEG_A   0b00000001
 #define SEG_B   0b00000010
@@ -144,6 +145,12 @@ public:
   
   // Display temperature or humidity with a number and letter t at the end of number
   void showReadingWithUnit(int temp, char unit);
+
+  // Display a string
+  // void showString(String word);
+
+  // encode letter array
+  // static uint8_t *encodeLetter(char c, uint8_t *add);
 
 protected:
    void bitDelay();

@@ -58,7 +58,7 @@ unsigned long prev_serial_time = 0;
 unsigned long serial_interval = 1000;
 // time tracker for led display
 unsigned long prev_disp_time = 0;
-unsigned long disp_interval = 5000;
+unsigned long disp_interval = 2000;
 // time tracker for sensors
 unsigned long prev_sense_time = 0;
 unsigned long sense_interval = 1000;
@@ -242,7 +242,7 @@ void loop(){
 
   // update the display at predefined interval
   if((current_millis-prev_disp_time)>disp_interval){
-    disp_count>1?disp_count = 0:disp_count; // update the display counter
+    disp_count>2?disp_count = 0:disp_count; // update the display counter
     j>10?j=0:j;
     if(ds_sensor_status){
       if(disp_count==0){
@@ -250,12 +250,16 @@ void loop(){
       }
       if(disp_count==1){
         disp_current.showReadingWithUnit((int)char_arr[j], 'H');
+        j++;
+      }
+      if(disp_count==2){
+        disp_current.clear();
       }
     }else{
       disp_current.clear();
       disp_current.setSegments(fail);
     }
-    j++;
+    
     disp_count++; // increment display counter
     prev_disp_time = current_millis;  // reset the display timer
   }

@@ -23,6 +23,7 @@ extern "C" {
 
 #include "TM1637.h"
 #include <Arduino.h>
+// #include <String.h>
 
 #define TM1637_I2C_COMM1    0x40
 #define TM1637_I2C_COMM2    0xC0
@@ -36,7 +37,35 @@ extern "C" {
 //  E |   | C
 //     ---
 //      D
-
+const uint8_t char_arr[26][1] = {
+    // XGFEDCBA
+    {0b01110111},    // A
+    {0b01111100},    // b
+    {0b00111001},    // C
+    {0b01011110},    // d
+    {0b01111001},    // E
+    {0b01110001},    // F
+    {0b00001000},     // G (blank)
+    {0b01110110},     // H
+    {0b00110000},     // I
+    {0b00011110},     // J
+    {0b00001000},     // K (blank)
+    {0b00111000},     // L
+    {0b00001000},     // M (blank)
+    {0b01010100},     // n
+    {0b00111111},     // O
+    {0b01110011},     // P
+    {0b00000000},     // Q (blank)
+    {0b00001000},     // R (blank)
+    {0b01101101},     // S
+    {0b01111000},     // t
+    {0b00111110},     // U
+    {0b00001000},     // V (blank)
+    {0b00001000},     // W (blank)
+    {0b00001000},     // X (blank)
+    {0b01101110},     // y
+    {0b00001000}      // Z (blank)
+};
 const uint8_t t_letter[] = {0b01111000};
 const uint8_t h_letter[] = {0b01110110};
 const uint8_t c_letter[] = {0b00111001};
@@ -271,15 +300,23 @@ void TM1637::showReadingWithUnit(int temp, char unit)
     }else{
         showNumberDec(temp, false, 3, 0);
     }
-    if(unit=='C'){
-        setSegments(c_letter, 1, 3);
-    }else if(unit=='H'){
-        setSegments(h_letter, 1, 3);
-    }
+    setSegments(char_arr[(int)unit-65], 1, 3);
     
 }
 
-void TM1637::showString(String word)
-{
+// uint8_t *TM1637::encodeLetter(char c, uint8_t *arr_add)
+// {
+//   return arr_add[(int)c-65];
+// }
 
-}
+
+
+// void TM1637::showString(String word)
+// {
+//     clear();
+//     for(int i=0; i<word.length(); i++){
+//         setSegments(char_arr[(int)word[i]-65], 1, i);
+
+//     }
+
+// }
