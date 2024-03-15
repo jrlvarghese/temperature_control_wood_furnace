@@ -151,7 +151,7 @@ void setup(){
   // }
   
   // get parameters from eeprom to parameter array
-  for(int i=0; i<3; i++){
+  for(int i=0; i<sizeof(parameter_arr); i++){
     parameter_arr[i] = read_EEPROM(i);
     // Serial.print(i);
     // Serial.print(": ");
