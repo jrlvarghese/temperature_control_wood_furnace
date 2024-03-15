@@ -25,6 +25,7 @@
 #define DISP_B_DAT 11
 #define DISP_B_CLK 10
 
+#define SHUTTER 13
 /* SET UP MODULES */
 // Create a display object of type TM1637Display
 TM1637 disp_current = TM1637(DISP_A_CLK, DISP_A_DAT);
@@ -72,14 +73,11 @@ unsigned long submenu_timer = 0;
 // parameter array to store values (default values in bracket)
 /*  1 -- cabin set temperature (65)
     2 -- cabin hysterisis (2)
-    3 -- cabin max temp (10) --> (cabin set temp + this value)
-    4 -- he min temp (80)
-    5 -- he max temp (200)
-    6 -- he hysteresis (5)
+    3 -- output actuator state (1)
 */
-unsigned int parameter_arr[8] = {65, 2, 10, 80, 200, 5, 0, 0};
+unsigned int parameter_arr[8] = {65, 2, 1};
 // min max array to
-int min_max_arr[8][2] = {{40,70},{0,8},{0,10},{60,150},{100,255},{0,15},{0,10},{0,10}};
+int min_max_arr[8][2] = {{40,70},{0,10}, {0,1}};
 int variable_min = 0;
 int variable_max = 0;
 
@@ -93,35 +91,6 @@ bool ds_sensor_status = false;
 const uint8_t dash[] = {
   SEG_G, SEG_G, SEG_G, SEG_G
 };
-// Create an array that turns all segments ON
-const uint8_t allON[] = {0xff, 0xff, 0xff, 0xff};
-
-// Create an array that turns all segments OFF
-const uint8_t allOFF[] = {0x00, 0x00, 0x00, 0x00};
-
-// Create an array that sets individual segments per digit to display the word "dOnE"
-const uint8_t done[] = {
-  SEG_B | SEG_C | SEG_D | SEG_E | SEG_G,           // d
-  SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F,   // O
-  SEG_C | SEG_E | SEG_G,                           // n
-  SEG_A | SEG_D | SEG_E | SEG_F | SEG_G            // E
-};
-
-
-const uint8_t letter_p[] = {
-    SEG_A | SEG_B | SEG_E | SEG_F | SEG_G
-};
-// const uint8_t heat[] = {
-//   SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
-//   SEG_A | SEG_D | SEG_E | SEG_F | SEG_G,
-//   SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
-//   SEG_D | SEG_E | SEG_F | SEG_G
-// };
-
-const uint8_t heat[] = {
-  SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
-  SEG_A | SEG_B | SEG_E | SEG_F | SEG_G
-};
 
 const uint8_t fail[] = {
   SEG_A | SEG_E | SEG_F | SEG_G,
@@ -134,7 +103,7 @@ const uint8_t fail[] = {
 // for test purposes
 int i=0;
 int j=0;
-char char_arr[] = {'a','b','c','d','e','f','g','h','i','j'};
+
 
 void setup(){
     Serial.begin(9600);
@@ -188,7 +157,7 @@ void loop(){
     menu_item = updateViaEncoder(menu_item, 0, 7);
     // if there is change in menu selection update the display
     if(prev_menu_item != menu_item){
-      show_menu_option(menu_item);
+      disp_set.show_menu_option(menu_item);
       // reset the menu timer: if there is no change in menu items it remains the same
       menu_timer = current_millis;
       // update the previous menu item so that when it changes display get updated
@@ -249,7 +218,7 @@ void loop(){
         disp_current.showReadingWithUnit(int(input_temp), 'C');
       }
       if(disp_count==1){
-        disp_current.showReadingWithUnit((int)char_arr[j], 'H');
+        disp_current.showReadingWithUnit(85, 'H');
         j++;
       }
       if(disp_count==2){
@@ -270,12 +239,7 @@ void loop(){
 
 /* FUNCTIONS */
 
-// show menu selection 
-void show_menu_option(int menu_item){
-  disp_set.clear(); // clear the display
-  disp_set.setSegments(letter_p, 1, 0); // load letter p
-  disp_set.showNumberDec(menu_item+1, false, 1, 1); // load the menu number
-}
+
 
 // Function to be implemented after detecting long press
 void long_press(){
@@ -315,7 +279,7 @@ int updateViaEncoder(int menu_item, int min, int max){
     //    delay(1);
     // check if menu_item exceeding the limits
     (menu_item>max)?menu_item=max:menu_item;
-    (menu_item<min)?menu_item=min:menu_item;
+    (menu_item<=min)?menu_item=min:menu_item;
 
     return menu_item;
 }

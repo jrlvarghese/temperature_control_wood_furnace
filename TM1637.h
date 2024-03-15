@@ -146,6 +146,8 @@ public:
   // Display temperature or humidity with a number and letter t at the end of number
   void showReadingWithUnit(int temp, char unit);
 
+  void show_menu_option(int menu_item);
+
   // Display a string
   // void showString(String word);
 

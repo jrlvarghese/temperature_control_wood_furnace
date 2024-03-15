@@ -304,6 +304,14 @@ void TM1637::showReadingWithUnit(int temp, char unit)
     
 }
 
+// show menu selection 
+void TM1637::show_menu_option(int menu_item)
+{
+  clear(); // clear the display
+  setSegments(char_arr[(int)'P'-65], 1, 0); // load letter p
+  showNumberDec(menu_item+1, false, 1, 1); // load the menu number
+}
+
 // uint8_t *TM1637::encodeLetter(char c, uint8_t *arr_add)
 // {
 //   return arr_add[(int)c-65];
