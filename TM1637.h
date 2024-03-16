@@ -148,6 +148,10 @@ public:
 
   void show_menu_option(int menu_item);
 
+  void blank();
+
+  void show_error();
+
   // Display a string
   // void showString(String word);
 

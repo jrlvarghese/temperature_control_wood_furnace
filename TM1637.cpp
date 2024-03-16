@@ -66,9 +66,9 @@ const uint8_t char_arr[26][1] = {
     {0b01101110},     // y
     {0b00001000}      // Z (blank)
 };
-const uint8_t t_letter[] = {0b01111000};
-const uint8_t h_letter[] = {0b01110110};
-const uint8_t c_letter[] = {0b00111001};
+// const uint8_t t_letter[] = {0b01111000};
+// const uint8_t h_letter[] = {0b01110110};
+// const uint8_t c_letter[] = {0b00111001};
 
 const uint8_t digitToSegment[] = {
  // XGFEDCBA
@@ -91,6 +91,15 @@ const uint8_t digitToSegment[] = {
   };
 
 static const uint8_t minusSegments = 0b01000000;
+
+static const uint8_t blank_all[] = {SEG_G, SEG_G, SEG_G, SEG_G};
+
+static const uint8_t fail[] = {
+  SEG_A | SEG_E | SEG_F | SEG_G,
+  SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
+  SEG_E | SEG_F,
+  SEG_E | SEG_F | SEG_D
+};
 
 TM1637::TM1637(uint8_t pinClk, uint8_t pinDIO, unsigned int bitDelay)
 {
@@ -310,6 +319,18 @@ void TM1637::show_menu_option(int menu_item)
   clear(); // clear the display
   setSegments(char_arr[(int)'P'-65], 1, 0); // load letter p
   showNumberDec(menu_item+1, false, 1, 1); // load the menu number
+}
+
+void TM1637::blank()
+{
+  clear();
+  setSegments(blank_all);
+}
+
+void TM1637::show_error()
+{
+  clear();
+  setSegments(fail);
 }
 
 // uint8_t *TM1637::encodeLetter(char c, uint8_t *arr_add)

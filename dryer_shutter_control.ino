@@ -100,16 +100,7 @@ int avg_counter = 0;
 
 /* NUM/LETTER ARRAY FOR LED DISPLAY */
 // dash line on startup
-const uint8_t dash[] = {
-  SEG_G, SEG_G, SEG_G, SEG_G
-};
 
-const uint8_t fail[] = {
-  SEG_A | SEG_E | SEG_F | SEG_G,
-  SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G,
-  SEG_E | SEG_F,
-  SEG_E | SEG_F | SEG_D
-};
 
 
 // for test purposes
@@ -132,8 +123,8 @@ void setup(){
   disp_current.setBrightness(5);
   disp_set.setBrightness(5);
   // display dash on start up
-  disp_current.setSegments(dash);
-  disp_set.setSegments(dash);
+  disp_current.blank();
+  disp_set.blank();
   delay(1000);
   //clear display
   disp_current.clear();
@@ -178,6 +169,10 @@ void loop(){
   prev_menu_item = -1;
   // MAIN MENU STARTS HERE
   while(menu_state){
+    disp_count>10000?disp_count=0:disp_count;
+    if(disp_count == 0)disp_current.clear();
+    disp_count++;
+
     current_millis = millis();
     // run button ticks to track button press
     button.tick();
@@ -267,8 +262,7 @@ void loop(){
         j++;
       }
     }else{
-      disp_current.clear();
-      disp_current.setSegments(fail);
+      disp_current.show_error();
     }
     
     disp_count++; // increment display counter
