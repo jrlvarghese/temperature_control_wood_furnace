@@ -1,5 +1,5 @@
-#Wood furnace temperature control with a shutter
-Uses a DS18B20 temperature sensor to sense temperature
+# Wood furnace temperature control with a shutter
+<!--Uses a DS18B20 temperature sensor to sense temperature-->
 AH20 temperature and humidity sensor will be added in future
 2 TM1637 display are used one for displaying set temperature and menu management and other for displaying current readings
 
